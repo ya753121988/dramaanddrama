@@ -1443,9 +1443,9 @@ def bot_auto_register(m):
             "coins": 0, "completed_tasks": [], "premium_until": None,
             "daily_stats": {"date": datetime.datetime.now().strftime("%Y-%m-%d"), "counts": {}}
         })
-        msg = f"✅ Registration Successful!\n\n📱 Number: `{user_id}`\n🔑 Password: `{user_id}`\n\nNow you can login to our website using these details."
+        msg = f"✅ Registration Successful!\n\n📱 Your Number (Login ID): `{user_id}`\n🔑 Your Password: `{user_id}`\n\nNow you can login to our website using these details."
     else:
-        msg = f"✅ You are already registered!\n\n📱 Number: `{user_id}`\n🔑 Password: `{user_id}`"
+        msg = f"✅ You are already registered!\n\n📱 Your Number (Login ID): `{user_id}`\n🔑 Your Password: `{user_id}`"
     
     bot.send_message(m.chat.id, msg, parse_mode="Markdown")
 
@@ -1485,13 +1485,13 @@ def handle_bot_start(m):
         markup = telebot.types.InlineKeyboardMarkup()
         markup.add(telebot.types.InlineKeyboardButton("🌐 Visit Website", url=BASE_URL))
         
-        # Check registration for credentials display
+        # New Registration detail display on start
         user = mongo.db.users.find_one({"number": user_id})
         reg_info = ""
         if user:
-            reg_info = f"\n\n🔐 Your Website Login Details:\n📱 Number: `{user_id}`\n🔑 Password: `{user_id}`"
+            reg_info = f"\n\n🔐 *Your Website Login Details:*\n📱 ID/Number: `{user_id}`\n🔑 Password: `{user_id}`"
         else:
-            reg_info = f"\n\n⚠️ You are not registered yet. Use /login to register automatically."
+            reg_info = "\n\n⚠️ You are not registered. Use /login to register automatically."
 
         info = f"👤 Profile Info:\n📝 Name: {m.from_user.first_name} {m.from_user.last_name or ''}\n🆔 ID: {m.from_user.id}\n🔗 Username: @{m.from_user.username or 'N/A'}{reg_info}\n\nWelcome! Visit the website to watch movies."
         bot.send_message(m.chat.id, info, reply_markup=markup, parse_mode="Markdown")
