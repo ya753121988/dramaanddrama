@@ -1487,7 +1487,34 @@ def start_adding_movie(m):
     except:
         bot.send_message(m.chat.id, "⚠️ Correct format: `/movie Name, Category, Quality`", parse_mode="Markdown")
 
-@bot.message_handler(content_types=['photo', 'text', 'video', 'document'])
+# --- Movie Search Handler for Bot (NEW ADDED) ---
+@bot.message_handler(func=lambda m: True, content_types=['text'])
+def bot_search_handler(m):
+    cid = m.chat.id
+    text = m.text.strip()
+
+    # If it's an admin interaction, let handle_bot_inputs take care of it
+    if cid in user_states:
+        handle_bot_inputs(m)
+        return
+    
+    # If it's a regular search query
+    if text.startswith('/'): return # Ignore other commands
+
+    # Search in DB
+    results = list(mongo.db.movies.find({"title": {"$regex": text, "$options": "i"}}).limit(10))
+
+    if results:
+        markup = telebot.types.InlineKeyboardMarkup()
+        for movie in results:
+            movie_url = f"{BASE_URL}/movie/{movie['_id']}"
+            markup.add(telebot.types.InlineKeyboardButton(f"🎬 {movie['title']} ({movie.get('category', 'Movie')})", url=movie_url))
+        
+        bot.send_message(cid, f"🔍 Search results for: *{text}*\nClick to watch below:", reply_markup=markup, parse_mode="Markdown")
+    else:
+        bot.send_message(cid, f"❌ Sorry, no movies found with the name '*{text}*'. Please check spelling and try again.", parse_mode="Markdown")
+
+@bot.message_handler(content_types=['photo', 'video', 'document'])
 def handle_bot_inputs(m):
     cid = m.chat.id
     if cid not in user_states: return
@@ -1497,7 +1524,8 @@ def handle_bot_inputs(m):
     settings = get_site_settings()
     channel_id = settings.get('file_channel')
 
-    if m.text and m.text.strip().lower() == '/done':
+    # Note: text handle logic inside search_handler to avoid conflict
+    if m.content_type == 'text' and m.text.strip().lower() == '/done':
         if state["status"] == "AWAITING_EPISODES":
             if not state["episodes"]:
                 bot.send_message(cid, "❌ No episodes found.")
