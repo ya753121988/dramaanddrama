@@ -20,7 +20,9 @@ BASE_URL = "https://kdramawatch.vercel.app"
 # --- New added Security and API Info ---
 API_ID = "29904834" 
 API_HASH = "8b4fd9ef578af114502feeafa2d31938" 
-OWNER_ID = 2130296341 # Your telegram ID here (Only you can add movies)
+
+# --- একাধিক এডমিন আইডি (বট ব্যবহারের অনুমতি) ---
+ADMIN_IDS = [2130296341] # এখানে কমা দিয়ে আরও এডমিন আইডি যোগ করতে পারবেন যেমন: [2130296341, 12345678]
 
 app = Flask(__name__)
 app.secret_key = "ULTRA_FINAL_FULL_MEGA_CODE_VERSION_PRO"
@@ -108,6 +110,41 @@ FULL_CSS = """
         overflow-x: hidden;
     }
     
+    /* --- Pop-up Notice Styles --- */
+    #popup-notice-overlay {
+        display: none;
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); z-index: 999999;
+        justify-content: center; align-items: center;
+    }
+    #popup-notice-box {
+        background: #1a1a1a; width: 85%; max-width: 400px;
+        padding: 30px 20px; border-radius: 20px; position: relative;
+        text-align: center; border: 2px solid var(--primary);
+        box-shadow: 0 0 30px rgba(229, 9, 20, 0.3);
+        animation: popupFade 0.3s ease-out;
+    }
+    @keyframes popupFade { from {transform: scale(0.8); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+
+    #popup-close-btn {
+        position: absolute; top: 12px; right: 12px;
+        background: var(--primary); color: white; border: none;
+        width: 30px; height: 30px; border-radius: 50%;
+        cursor: pointer; font-size: 18px; font-weight: bold;
+    }
+    #popup-tg-link-icon {
+        position: absolute; bottom: 12px; left: 12px;
+        background: #0088cc; color: white;
+        width: 45px; height: 45px; border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        text-decoration: none; font-size: 22px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .popup-content-text {
+        font-size: 16px; color: white;
+        margin-bottom: 10px; line-height: 1.5; font-weight: bold;
+    }
+
     #loader { 
         display: none; 
         position: fixed; 
@@ -395,6 +432,23 @@ FULL_CSS = """
         document.getElementById('loader').style.display = 'none';
     });
 
+    // --- Pop-up Logic ---
+    function showPopupNotice() {
+        document.getElementById('popup-notice-overlay').style.display = 'flex';
+    }
+    function closePopupNotice() {
+        document.getElementById('popup-notice-overlay').style.display = 'none';
+        localStorage.setItem('last_popup_time', new Date().getTime());
+    }
+    function checkPopup(intervalMinutes) {
+        const lastSeen = localStorage.getItem('last_popup_time') || 0;
+        const now = new Date().getTime();
+        const diff = (now - lastSeen) / (1000 * 60);
+        if (diff >= intervalMinutes) {
+            showPopupNotice();
+        }
+    }
+
     // --- Auto slider logic ---
     document.addEventListener("DOMContentLoaded", function() {
         const slider = document.querySelector('.slider');
@@ -460,7 +514,10 @@ def get_site_settings():
                 "notif_main": "t.me/drama4uofficial",
                 "notif_chat": "t.me/drama2hchat",
                 "notif_fb": "facebook.com/bddranaworld",
-                "notif_footer": "#drama2h @drama2h #movies"
+                "notif_footer": "#drama2h @drama2h #movies",
+                "popup_msg": "Join our Telegram for updates!",
+                "popup_link": "https://t.me/drama4uofficial",
+                "popup_time": 30
             }
             mongo.db.settings.insert_one({"type": "config", **default})
             return default
@@ -499,7 +556,19 @@ def render_full_page(body_html, **kwargs):
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         """ + FULL_CSS + """
     </head>
-    <body>
+    <body onload="checkPopup({{ settings.popup_time or 30 }})">
+
+        <!-- New Pop-up Notice -->
+        <div id="popup-notice-overlay">
+            <div id="popup-notice-box">
+                <button id="popup-close-btn" onclick="closePopupNotice()">&times;</button>
+                <div class="popup-content-text">{{ settings.popup_msg }}</div>
+                <a href="{{ settings.popup_link }}" id="popup-tg-link-icon" target="_blank">
+                    <i class="fab fa-telegram-plane"></i>
+                </a>
+            </div>
+        </div>
+
         <div id="loader"><div class="spinner"></div><p style="margin-top:20px; color:var(--primary); font-weight:bold;">Loading...</p></div>
         
         <div class="notice-bar">{{ settings.notice }}</div>
@@ -1070,6 +1139,14 @@ def admin():
                 "popunder_code": request.form.get('popunder_code')
             }}, upsert=True)
             flash("Popunder Add settings updated!")
+        # --- NEW Action for Pop-up Modal Settings ---
+        elif action == 'update_popup':
+            mongo.db.settings.update_one({"type": "config"}, {"$set": {
+                "popup_msg": request.form.get('popup_msg'),
+                "popup_link": request.form.get('popup_link'),
+                "popup_time": int(request.form.get('popup_time', 30))
+            }}, upsert=True)
+            flash("Pop-up Modal settings updated!")
         elif action == 'delete_movie':
             mid = request.form.get('movie_id')
             mongo.db.movies.delete_one({"_id": ObjectId(mid)})
@@ -1096,6 +1173,19 @@ def admin():
             Mobile Number: <input name="admin_number" value="{{ admin_user.number }}" required>
             New Password (Leave blank for no change): <input type="password" name="admin_password" placeholder="New Password">
             <button class="btn" type="submit" style="background:#00c6ff;">Update Credentials</button>
+        </form>
+    </div>
+
+    <!-- Pop-up Modal Setting Menu (NEW) -->
+    <div class="card" style="border-top:4px solid #f39c12;">
+        <h3><i class="fas fa-window-restore"></i> Pop-up Modal Notice</h3>
+        <p style="color:var(--gray); font-size:12px; margin-bottom:10px;">Set the automatic popup message and interval.</p>
+        <form method="POST">
+            <input type="hidden" name="action" value="update_popup">
+            Message: <input name="popup_msg" value="{{ settings.popup_msg }}" placeholder="Join Telegram for updates!">
+            Join Link: <input name="popup_link" value="{{ settings.popup_link }}" placeholder="https://t.me/yourlink">
+            Popup Interval (Minutes): <input type="number" name="popup_time" value="{{ settings.popup_time }}" placeholder="30">
+            <button class="btn" type="submit" style="background:#f39c12;">Save Pop-up Modal</button>
         </form>
     </div>
 
@@ -1373,10 +1463,13 @@ def handle_bot_start(m):
         info = f"👤 Profile Info:\n📝 Name: {m.from_user.first_name} {m.from_user.last_name or ''}\n🆔 ID: {m.from_user.id}\n🔗 Username: @{m.from_user.username or 'N/A'}\n\nWelcome! Visit the website to watch movies."
         bot.send_message(m.chat.id, info, reply_markup=markup)
 
+# --- Multiple Admins IDs ---
+ADMIN_LIST = [2130296341] # Add more Telegram IDs here
+
 @bot.message_handler(commands=['movie'])
 def start_adding_movie(m):
-    if int(m.from_user.id) != int(OWNER_ID):
-        bot.send_message(m.chat.id, f"❌ You are not the owner!")
+    if int(m.from_user.id) not in ADMIN_LIST:
+        bot.send_message(m.chat.id, f"❌ You are not an authorized admin!")
         return
     try:
         parts = m.text.split('/movie ')[1].split(',')
@@ -1398,7 +1491,7 @@ def start_adding_movie(m):
 def handle_bot_inputs(m):
     cid = m.chat.id
     if cid not in user_states: return
-    if int(m.from_user.id) != int(OWNER_ID): return 
+    if int(m.from_user.id) not in ADMIN_LIST: return 
     
     state = user_states[cid]
     settings = get_site_settings()
