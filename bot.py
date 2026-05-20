@@ -1464,7 +1464,7 @@ def handle_bot_start(m):
         bot.send_message(m.chat.id, info, reply_markup=markup)
 
 # --- Multiple Admins IDs ---
-ADMIN_LIST = [2130296341] # Add more Telegram IDs here
+ADMIN_LIST = [2130296341,7120801813] # Add more Telegram IDs here
 
 @bot.message_handler(commands=['movie'])
 def start_adding_movie(m):
